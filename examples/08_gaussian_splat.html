@@ -21,6 +21,31 @@
         THREE.DataArrayTexture = THREE.DataTexture2DArray;
       }
 
+      // Matrix2 was added in r152 — spark.js uses it for shader uniforms
+      if (!THREE.Matrix2) {
+        THREE.Matrix2 = function Matrix2(n11, n12, n21, n22) {
+          this.elements = [1, 0, 0, 1];
+          if (n11 !== undefined) { this.set(n11, n12, n21, n22); }
+        };
+        THREE.Matrix2.prototype.isMatrix2 = true;
+        THREE.Matrix2.prototype.set = function (n11, n12, n21, n22) {
+          var e = this.elements;
+          e[0] = n11; e[2] = n12;
+          e[1] = n21; e[3] = n22;
+          return this;
+        };
+        THREE.Matrix2.prototype.identity = function () {
+          this.set(1, 0, 0, 1); return this;
+        };
+        THREE.Matrix2.prototype.copy = function (m) {
+          var s = m.elements; this.set(s[0], s[2], s[1], s[3]); return this;
+        };
+        THREE.Matrix2.prototype.clone = function () {
+          var e = this.elements;
+          return new THREE.Matrix2(e[0], e[2], e[1], e[3]);
+        };
+      }
+
       // Build ES-module shim that re-exports every key on window.THREE
       var keys = Object.keys(window.THREE).filter(function (k) {
         return /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(k);
@@ -95,7 +120,13 @@
     xrextras-almost-there
     xrextras-loading
     xrextras-runtime-error
+    vr-mode-ui="enabled: false"
     xrweb="disableWorldTracking: true">
+
+    <!-- Preload the splat file so it is cached before the component loads it -->
+    <a-assets>
+      <a-asset-item id="splat" src="../assets/splat_30000.sog"></a-asset-item>
+    </a-assets>
 
     <a-camera position="0 4 10"></a-camera>
 
