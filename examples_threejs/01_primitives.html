@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>01 — 3D Primitives (Three.js)</title>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    canvas { display: block; width: 100%; height: 100%; }
+  </style>
+
+  <script type="importmap">
+  { "imports": {
+      "three": "https://esm.sh/three@0.178.0",
+      "three/addons/": "https://esm.sh/three@0.178.0/examples/jsm/"
+  } }
+  </script>
+
+  <!-- 8th Wall Engine -->
+  <script async src="../engine/xr.js" data-preload-chunks="slam"></script>
+</head>
+<body>
+  <canvas id="xr-canvas"></canvas>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { startXR8, applyTargetPose } from './lib/xr8-three-bootstrap.js';
+
+    // --- Content group (hidden until image target is found) ---
+    const group = new THREE.Group();
+    group.visible = false;
+
+    // --- Title (canvas-based text sprite) ---
+    function makeTextSprite(text, fontSize, color) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 512; canvas.height = 128;
+      const ctx = canvas.getContext('2d');
+      ctx.font = `bold ${fontSize}px Arial`;
+      ctx.fillStyle = color;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, 256, 64);
+      const tex = new THREE.CanvasTexture(canvas);
+      const mat = new THREE.SpriteMaterial({ map: tex, transparent: true });
+      const sprite = new THREE.Sprite(mat);
+      sprite.scale.set(4, 1, 1);
+      return sprite;
+    }
+
+    const title = makeTextSprite('3D Primitives', 48, '#ffffff');
+    title.position.set(0, 2.2, 0);
+    group.add(title);
+
+    // --- Ground plane ---
+    const ground = new THREE.Mesh(
+      new THREE.PlaneGeometry(4, 3),
+      new THREE.MeshStandardMaterial({ color: 0x333333, opacity: 0.4, transparent: true })
+    );
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.set(0, -0.01, 0);
+    group.add(ground);
+
+    // --- Row 1: Box, Sphere, Cylinder ---
+    const box = new THREE.Mesh(
+      new THREE.BoxGeometry(0.6, 0.6, 0.6),
+      new THREE.MeshStandardMaterial({ color: 0xFF0055 })
+    );
+    box.position.set(-1.2, 0.5, -0.5);
+    group.add(box);
+
+    const sphere = new THREE.Mesh(
+      new THREE.SphereGeometry(0.35, 32, 32),
+      new THREE.MeshStandardMaterial({ color: 0x00AAFF })
+    );
+    sphere.position.set(0, 0.5, -0.5);
+    group.add(sphere);
+
+    const cylinder = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.25, 0.25, 0.8, 32),
+      new THREE.MeshStandardMaterial({ color: 0x33CC33 })
+    );
+    cylinder.position.set(1.2, 0.4, -0.5);
+    group.add(cylinder);
+
+    // --- Row 2: Cone, Torus, Ring ---
+    const cone = new THREE.Mesh(
+      new THREE.ConeGeometry(0.35, 0.8, 32),
+      new THREE.MeshStandardMaterial({ color: 0xFFAA00 })
+    );
+    cone.position.set(-1.2, 0.45, 0.5);
+    group.add(cone);
+
+    const torus = new THREE.Mesh(
+      new THREE.TorusGeometry(0.3, 0.06, 16, 48),
+      new THREE.MeshStandardMaterial({ color: 0xAA00FF })
+    );
+    torus.position.set(0, 0.5, 0.5);
+    group.add(torus);
+
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(0.15, 0.35, 32),
+      new THREE.MeshStandardMaterial({ color: 0xFF5599, side: THREE.DoubleSide })
+    );
+    ring.position.set(1.2, 0.5, 0.5);
+    group.add(ring);
+
+    // --- Start XR8 ---
+    const { scene } = await startXR8({
+      canvas: document.getElementById('xr-canvas'),
+      imageTargets: [{
+        name: 'my-poster',
+        type: 'PLANAR',
+        imagePath: '../assets/Targets/Target_1000055040.jpg',
+        properties: {
+          left: 0, top: 0,
+          width: 830, height: 830,
+          originalWidth: 830, originalHeight: 830,
+          isRotated: false
+        }
+      }],
+      onImageFound: (detail) => {
+        applyTargetPose(group, detail);
+        group.visible = true;
+      },
+      onImageUpdated: (detail) => {
+        applyTargetPose(group, detail);
+      },
+      onImageLost: () => {
+        group.visible = false;
+      },
+      onRenderLoop: (_ctx, _delta) => {
+        const t = performance.now() * 0.001;
+
+        // Box: continuous Y rotation
+        box.rotation.y = (t * Math.PI * 2) / 4; // full turn in 4s
+
+        // Sphere: bounce between y=0.5 and y=1.0
+        const bounce = Math.sin(t * Math.PI / 1.5) * 0.5; // easeInOutQuad-ish
+        sphere.position.y = 0.5 + Math.abs(bounce) * 0.5;
+
+        // Cylinder: continuous X rotation
+        cylinder.rotation.x = (t * Math.PI * 2) / 3;
+
+        // Cone: scale pulse 1.0 ↔ 1.3
+        const s = 1.0 + 0.3 * Math.abs(Math.sin(t * Math.PI / 1.2));
+        cone.scale.set(s, s, s);
+
+        // Torus: dual-axis rotation
+        torus.rotation.x = (t * Math.PI * 2) / 5;
+        torus.rotation.y = (t * Math.PI * 2) / 5;
+
+        // Ring: Z rotation
+        ring.rotation.z = (t * Math.PI * 2) / 3.5;
+      }
+    });
+
+    scene.add(group);
+  </script>
+</body>
+</html>

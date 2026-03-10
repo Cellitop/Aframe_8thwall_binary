@@ -36,6 +36,7 @@ Think of it like an interactive poster: a printed image becomes a trigger that m
     - [Option B: VS Code on your computer with Live Server](#option-b-vs-code-on-your-computer-with-live-server)
   - [Step 3: Test on your phone](#step-3-test-on-your-phone)
   - [Step 4: Publish to GitHub Pages (make it public)](#step-4-publish-to-github-pages-make-it-public)
+- [Raw Three.js Examples](#raw-threejs-examples)
 - [How to Modify the Examples](#how-to-modify-the-examples)
   - [Understanding the HTML structure](#understanding-the-html-structure)
   - [Changing the image target](#changing-the-image-target)
@@ -66,6 +67,52 @@ Each example is a single HTML file that demonstrates one technique. They go from
 | 07 | [p5.js](examples/07_p5js.html) | A colorful animated pattern (generated live by code) is displayed as a texture on a 3D plane | How to use p5.js (a creative coding library popular in design schools) to generate visuals and map them onto a 3D surface in AR | Just print the image target |
 | 08 | [Gaussian Splat](examples/08_gaussian_splat.html) | A photorealistic 3D scan (point cloud) appears above the image | How to display Gaussian Splat captures (a new 3D scanning technique) in AR | Print the image target. The file `splat_30000.sog` (19 MB) is included |
 | 09 | [Multi Targets](examples/09_multi_targets.html) | Four different images are each recognized and display different colored shapes and labels | How to track multiple images at the same time, each triggering its own AR content | Print all 4 image targets (see below) |
+
+---
+
+## Raw Three.js Examples
+
+The `examples_threejs/` folder contains the **same 9 examples rewritten with raw Three.js r178** and XR8 camera pipeline hooks — no A-Frame, no 8frame.
+
+### Why a second set?
+
+The A-Frame examples use 8frame 1.3.0 which bundles Three.js r137. Modern libraries like [Spark.js](https://sparkjs.dev/) (Gaussian Splatting) require Three.js r178+. We tried several workarounds:
+
+- Polyfilling missing Three.js APIs — fixes JS renames but cannot patch shader compilation
+- Loading two Three.js versions side by side — the r137 renderer crashes on r178 materials (`material.onBuild is not a function`)
+- Switching to standard A-Frame 1.7.0 — bundles r173, still too old
+
+The solution: bypass A-Frame entirely and use Three.js r178 directly with XR8's pipeline API.
+
+### Architecture
+
+All examples share a common bootstrap module (`examples_threejs/lib/xr8-three-bootstrap.js`) that handles:
+- Three.js renderer setup (sharing XR8's GL context)
+- Camera feed background via `XR8.GlTextureRenderer`
+- Image target events (`xrimagefound`, `xrimageupdated`, `xrimagelost`)
+- Loading overlay and default lighting
+
+Each example is an ES module that imports `three` from [esm.sh](https://esm.sh) via an import map:
+
+```html
+<script type="importmap">
+{ "imports": { "three": "https://esm.sh/three@0.178.0" } }
+</script>
+```
+
+### Three.js examples list
+
+| # | Example | Key library | Difference from A-Frame version |
+|---|---------|-------------|-------------------------------|
+| 01 | [Primitives](examples_threejs/01_primitives.html) | Three.js core | Manual geometry/material, render-loop animations |
+| 02 | [Text & Fonts](examples_threejs/02_text_msdf.html) | [troika-three-text](https://github.com/protectwise/troika/tree/main/packages/troika-three-text) | SDF text from .woff2 fonts (no MSDF JSON atlas needed) |
+| 03 | [Images](examples_threejs/03_images.html) | Three.js TextureLoader | PlaneGeometry + MeshBasicMaterial |
+| 04 | [3D Models](examples_threejs/04_3d_models.html) | GLTFLoader + AnimationMixer | Standard Three.js pattern (replaces aframe-extras) |
+| 05 | [Video Chroma](examples_threejs/05_video_chroma.html) | VideoTexture + ShaderMaterial | Same GLSL shader, direct ShaderMaterial instead of registerShader |
+| 06 | [Audio](examples_threejs/06_audio.html) | Web Audio API | Same `new Audio()`, tracking callbacks from bootstrap |
+| 07 | [p5.js](examples_threejs/07_p5js.html) | p5.js + CanvasTexture | Identical p5 sketch, texture update in render loop |
+| 08 | [**Gaussian Splat**](examples_threejs/08_gaussian_splat.html) | **Spark.js (SplatMesh)** | **Works natively** — loads `.sog` files directly, no polyfills |
+| 09 | [Multi Targets](examples_threejs/09_multi_targets.html) | Map-based group routing | One THREE.Group per target, callbacks route by name |
 
 ---
 
@@ -589,7 +636,7 @@ Aframe_8thwall_binary/
 ├── index.html                 The landing page — a gallery with links to all 9 examples
 ├── README.md                  This documentation
 │
-├── examples/                  One HTML file per example (self-contained)
+├── examples/                  A-Frame examples (8frame 1.3.0 + Three.js r137)
 │   ├── 01_primitives.html         Basic 3D shapes with animations
 │   ├── 02_text_msdf.html          Text with custom fonts
 │   ├── 03_images.html             Flat images displayed in AR
@@ -599,6 +646,12 @@ Aframe_8thwall_binary/
 │   ├── 07_p5js.html               p5.js generative graphics as AR texture
 │   ├── 08_gaussian_splat.html     Photorealistic 3D scan rendering
 │   └── 09_multi_targets.html      Multiple images tracked at once
+│
+├── examples_threejs/          Raw Three.js examples (r178 + XR8 pipeline hooks)
+│   ├── lib/
+│   │   └── xr8-three-bootstrap.js Shared XR8 + Three.js setup module
+│   ├── 01–09_*.html               Same examples, no A-Frame dependency
+│   └── 08_gaussian_splat.html     Spark.js works natively with r178
 │
 ├── engine/                    The AR engine (do not modify these files)
 │   ├── xr.js                     Main engine file

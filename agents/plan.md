@@ -291,3 +291,90 @@ XR8.XrController.configure({
 | p5.js v1.9.4 | v2.x has breaking changes to instance mode |
 | All code inline per file | Each example is fully self-contained |
 | Placeholder-only assets | Users provide their own GLB/MP4/MP3/SOG/JPG files |
+
+---
+
+## Raw Three.js Examples (`examples_threejs/`)
+
+### Why a second set of examples?
+
+8frame 1.3.0 bundles Three.js r137. Modern libraries like spark.js (Gaussian Splatting) require Three.js r178+. Attempts to work around this failed:
+
+- **Polyfills (Matrix2, Data3DTexture, etc.)** — fix JS API renames but cannot patch shader compilation differences
+- **Dual Three.js instances** — loading r178 alongside r137 causes `material.onBuild is not a function` because the r137 renderer cannot draw materials created by r178
+- **A-Frame 1.7.0** — bundles r173, still too old for spark.js (needs r178)
+
+The solution: raw Three.js r178 + XR8 camera pipeline hooks, no A-Frame/8frame.
+
+### Architecture
+
+```
+examples_threejs/
+├── lib/
+│   └── xr8-three-bootstrap.js   ← shared XR8 + Three.js setup (ES module)
+├── 01_primitives.html
+├── 02_text_msdf.html
+├── 03_images.html
+├── 04_3d_models.html
+├── 05_video_chroma.html
+├── 06_audio.html
+├── 07_p5js.html
+├── 08_gaussian_splat.html        ← spark.js works natively here
+└── 09_multi_targets.html
+```
+
+### Shared bootstrap: `lib/xr8-three-bootstrap.js`
+
+ES module that every example imports. Key responsibilities:
+
+1. Creates `THREE.WebGLRenderer` sharing XR8's GL context (`{ canvas, context: GLctx, alpha: true }`)
+2. Registers XR8 camera pipeline modules in order:
+   - `XR8.GlTextureRenderer.pipelineModule()` — draws camera feed as background
+   - Custom "threejs" module — applies camera pose/projection from XR8, renders scene
+   - `XR8.XrController.pipelineModule()` — tracking controller
+3. Listens for `xrimagefound`/`xrimageupdated`/`xrimagelost` DOM events
+4. Shows/removes CSS loading overlay
+5. Adds default ambient + directional lights
+
+**Exported API:**
+```js
+export async function startXR8({ canvas, imageTargets, disableWorldTracking,
+  onImageFound, onImageUpdated, onImageLost, onRenderLoop })
+  → { scene, camera, renderer, clock }
+
+export function applyTargetPose(obj, detail)
+```
+
+### Import map (in each HTML `<head>`)
+
+```html
+<script type="importmap">
+{ "imports": {
+    "three": "https://esm.sh/three@0.178.0",
+    "three/addons/": "https://esm.sh/three@0.178.0/examples/jsm/"
+} }
+</script>
+```
+
+### CDN libraries
+
+| Library | URL | Used in |
+|---------|-----|---------|
+| Three.js r178 | `esm.sh/three@0.178.0` | All examples |
+| troika-three-text | `esm.sh/troika-three-text@0.52.4?external=three` | 02 (text) |
+| spark.js | `esm.sh/@sparkjsdev/spark@0.1.10?external=three` | 08 (splats) |
+| p5.js 1.9.4 | `cdn.jsdelivr.net/npm/p5@1.9.4/lib/p5.min.js` | 07 (p5) |
+| GLTFLoader | `esm.sh/three@0.178.0/examples/jsm/loaders/GLTFLoader.js` | 04 (models) |
+
+### Key differences from A-Frame examples
+
+| Concern | A-Frame (`examples/`) | Raw Three.js (`examples_threejs/`) |
+|---------|----------------------|-----------------------------------|
+| Scene setup | `<a-scene>` auto-creates renderer | Manual `THREE.Scene`, `THREE.WebGLRenderer` |
+| Camera feed | `xrweb` component | `XR8.GlTextureRenderer.pipelineModule()` |
+| Image tracking | `xrextras-named-image-target` show/hide | DOM events → manual `group.visible` toggle |
+| Lighting | A-Frame default lights | Explicit `AmbientLight` + `DirectionalLight` |
+| Animation | Declarative `animation="..."` | Render loop with `performance.now()` |
+| Text | `<a-text>` / MSDF shader | `troika-three-text` or `CanvasTexture` sprites |
+| GLTF | `gltf-model` + `animation-mixer` | `GLTFLoader` + `THREE.AnimationMixer` |
+| Video | `<video>` in `<a-assets>` | `THREE.VideoTexture` + `ShaderMaterial` |

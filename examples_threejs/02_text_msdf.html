@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>02 — Text & Fonts (Three.js)</title>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    canvas { display: block; width: 100%; height: 100%; }
+  </style>
+
+  <script type="importmap">
+  { "imports": {
+      "three": "https://esm.sh/three@0.178.0",
+      "three/addons/": "https://esm.sh/three@0.178.0/examples/jsm/",
+      "troika-three-text": "https://esm.sh/troika-three-text@0.52.4?external=three"
+  } }
+  </script>
+
+  <!-- 8th Wall Engine -->
+  <script async src="../engine/xr.js" data-preload-chunks="slam"></script>
+</head>
+<body>
+  <canvas id="xr-canvas"></canvas>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { Text } from 'troika-three-text';
+    import { startXR8, applyTargetPose } from './lib/xr8-three-bootstrap.js';
+
+    const group = new THREE.Group();
+    group.visible = false;
+
+    // Helper to create a troika text mesh
+    function createText(value, opts = {}) {
+      const t = new Text();
+      t.text = value;
+      t.fontSize = opts.fontSize || 0.2;
+      t.color = opts.color || '#ffffff';
+      t.anchorX = 'center';
+      t.anchorY = 'middle';
+      if (opts.font) t.font = opts.font;
+      t.position.set(opts.x || 0, opts.y || 0, opts.z || 0);
+      t.sync();
+      return t;
+    }
+
+    // Google Fonts CDN URLs (woff2 — troika handles SDF generation internally)
+    const creepster = 'https://fonts.gstatic.com/s/creepster/v13/AlZy_zVUqJz4yMrDB4zE.woff2';
+    const berkshire = 'https://fonts.gstatic.com/s/berkshireswash/v20/ptRRTi-cavZOGqCvnNJDl00GRlm3H3Bq.woff2';
+    const crimson   = 'https://fonts.gstatic.com/s/crimsontext/v19/wlp2gwHKFkZgtmSR3NB0oRJfajhRK_Y.woff2';
+
+    // 1. Default text (no custom font)
+    group.add(createText('Default Sans-Serif', {
+      y: 2.0, fontSize: 0.25, color: '#ffffff'
+    }));
+
+    // 2. Creepster
+    group.add(createText('Creepster Font', {
+      y: 1.4, fontSize: 0.3, color: '#FF0055', font: creepster
+    }));
+
+    // 3. Berkshire Swash
+    group.add(createText('Berkshire Swash', {
+      y: 0.8, fontSize: 0.3, color: '#00AAFF', font: berkshire
+    }));
+
+    // 4. Crimson Text
+    group.add(createText('Crimson Text', {
+      y: 0.2, fontSize: 0.3, color: '#33CC33', font: crimson
+    }));
+
+    // 5. Size comparison
+    group.add(createText('Small (0.15)', {
+      y: -0.4, fontSize: 0.15, color: '#FFAA00', font: creepster
+    }));
+    group.add(createText('Large (0.45)', {
+      y: -0.9, fontSize: 0.45, color: '#FFAA00', font: creepster
+    }));
+
+    // --- Start XR8 ---
+    const { scene } = await startXR8({
+      canvas: document.getElementById('xr-canvas'),
+      imageTargets: [{
+        name: 'my-poster',
+        type: 'PLANAR',
+        imagePath: '../assets/Targets/Target_1000055040.jpg',
+        properties: {
+          left: 0, top: 0,
+          width: 830, height: 830,
+          originalWidth: 830, originalHeight: 830,
+          isRotated: false
+        }
+      }],
+      onImageFound: (detail) => {
+        applyTargetPose(group, detail);
+        group.visible = true;
+      },
+      onImageUpdated: (detail) => {
+        applyTargetPose(group, detail);
+      },
+      onImageLost: () => {
+        group.visible = false;
+      }
+    });
+
+    scene.add(group);
+  </script>
+</body>
+</html>
